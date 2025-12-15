@@ -1,8 +1,9 @@
 package main
 
-import "fmt"
+import "sync"
 
-func multiplier(ch <-chan int, sqCh chan<- int) {
+func multiplier(ch <-chan int, sqCh chan<- int, wg *sync.WaitGroup) {
+	defer wg.Done()
 	for val := range ch {
 		sqCh <- val * val
 	}
@@ -10,24 +11,28 @@ func multiplier(ch <-chan int, sqCh chan<- int) {
 }
 
 func main() {
-	ch := make(chan int, 101)
-	sqCh := make(chan int, 101)
+	ch := make(chan int)
+	sqCh := make(chan int)
+	var wg sync.WaitGroup
 
-	go multiplier(ch, sqCh)
-	go multiplier(ch, sqCh)
-	go multiplier(ch, sqCh)
-	go multiplier(ch, sqCh)
-	go multiplier(ch, sqCh)
+	groupCount := 10
+
+	wg.Add(groupCount)
+	for j := 0; j <= groupCount; j++ {
+		go multiplier(ch, sqCh, &wg)
+	}
 
 	go func() {
 		rep := 10
-		fmt.Println("start")
 		for i := 0; i < rep; i++ {
 			ch <- i
-			fmt.Printf(" %v", i)
 		}
+		close(ch)
 	}()
 
-	for {
-	}
+	go func() {
+		wg.Wait()
+		close(sqCh)
+	}()
+
 }
